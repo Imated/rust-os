@@ -1,0 +1,24 @@
+[package]
+name = "rust-os"
+version = "0.1.0"
+edition = "2024"
+
+[profile.dev]
+panic = "abort"
+lto = false
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+
+[[bin]]
+name = "rust-os"
+test = false
+bench = false
+
+[dependencies]
+limine = "0.6.5"
+x86_64 = "0.15.4"

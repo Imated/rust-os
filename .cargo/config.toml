@@ -1,0 +1,19 @@
+[target.x86_64-os]
+rustflags = [
+    "-C",
+    "force-frame-pointers",
+    "-C",
+    "link-arg=-Tmisc/linker.ld",
+    "-C",
+    "link-arg=--gc-sections",
+    "-C",
+    "codegen-units=1",
+]
+
+[build]
+target = "x86_64-os.json"
+
+[unstable]
+json-target-spec = true
+build-std-features = ["compiler-builtins-mem"]
+build-std = ["core", "compiler_builtins"]
