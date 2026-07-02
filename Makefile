@@ -33,7 +33,7 @@ run: iso
 		-bios /usr/share/edk2/x64/OVMF.4m.fd \
 		-cdrom $(ISO) \
 		-m 256M \
-		-serial stdio
+		-serial stdio -no-reboot -no-shutdown -d int -D logfile.txt
 
 clean:
 	cargo clean
