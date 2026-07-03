@@ -4,24 +4,24 @@ use core::convert::Into;
 use core::slice::from_raw_parts_mut;
 use noto_sans_mono_bitmap::{get_raster, FontWeight, RasterHeight};
 
-pub struct Framebuffer {
-    front_buffer: *mut u32,
+pub struct Framebuffer<'a> {
+    front_buffer: &'a mut [Color],
     pixels_per_scanline: u64,
     width: u32,
     height: u32,
 }
 
-impl Framebuffer {
-    pub fn new(framebuffer: &limine::framebuffer::Framebuffer) -> Self {
+impl<'a> Framebuffer<'a> {
+    pub unsafe fn new(framebuffer: &limine::framebuffer::Framebuffer) -> Self { unsafe {
         Self {
-            front_buffer: framebuffer.address() as *mut u32,
+            front_buffer: from_raw_parts_mut(framebuffer.address() as *mut Color, (framebuffer.width * framebuffer.height) as usize),
             pixels_per_scanline: framebuffer.pitch / 4,
             width: framebuffer.width as u32,
             height: framebuffer.height as u32,
         }
-    }
+    }}
 
-    pub unsafe fn put_char_at(&self, c: char, x: u32, y: u32, color: Color) {
+    pub fn put_char_at(&mut self, c: char, x: u32, y: u32, color: Color) {
         let Some(raster) = get_raster(c, FontWeight::Regular, RasterHeight::Size16) else {
             return;
         };
@@ -54,12 +54,11 @@ impl Framebuffer {
         }
     }
 
-    pub unsafe fn set_pixel(&self, x: u64, y: u64, color: Color) {
-        self.front_buffer.offset((y * self.pixels_per_scanline + x) as isize).write(cast(color));
+    pub fn set_pixel(&mut self, x: u64, y: u64, color: Color) {
+        self.front_buffer[(y * self.pixels_per_scanline + x) as usize] = color;
     }
 
-    pub unsafe fn clear(&self, color: Color) {
-        let slice = from_raw_parts_mut(self.front_buffer, (self.width * self.height) as usize);
-        slice.fill(cast(color));
+    pub fn clear(&mut self, color: Color) {
+        self.front_buffer.fill(color);
     }
 }

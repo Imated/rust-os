@@ -23,7 +23,7 @@ pub extern "C" fn _start() -> ! { unsafe {
     if let Some(resp) = FRAMEBUFFER.response()
         && let Some(&fb) = resp.framebuffers().first()
     {
-        let framebuffer = Framebuffer::new(fb);
+        let mut framebuffer = Framebuffer::new(fb);
         framebuffer.clear(Color::BACKGROUND_COLOR);
         framebuffer.put_char_at('e', 0, 0, Color::WHITE);
     }
