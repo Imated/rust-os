@@ -3,14 +3,14 @@ ISO     := kernel.iso
 ISO_DIR := iso_root
 LIMINE  := limine
 
-.PHONY: all iso run run-uefi clean
+.PHONY: all iso run run-uefi clean build
 
 all: iso
 
-$(KERNEL):
+build:
 	cargo build
 
-iso: $(KERNEL)
+iso: build
 	rm -rf $(ISO_DIR)
 	mkdir -p $(ISO_DIR)/boot/limine $(ISO_DIR)/EFI/BOOT
 	cp $(KERNEL)                     $(ISO_DIR)/boot/kernel
