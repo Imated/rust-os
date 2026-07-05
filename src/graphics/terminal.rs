@@ -1,10 +1,10 @@
-use core::fmt::Write;
-use log::{Level, Log, Metadata, Record};
 use crate::graphics::framebuffer::Framebuffer;
 use crate::types::Color;
-use noto_sans_mono_bitmap::{get_raster, get_raster_width, FontWeight, RasterHeight};
-use spin::{MutexGuard, Spin};
 use crate::{FRAMEBUFFER, TERMINAL};
+use core::fmt::Write;
+use log::{Level, Log, Metadata, Record};
+use noto_sans_mono_bitmap::{FontWeight, RasterHeight, get_raster, get_raster_width};
+use spin::{MutexGuard, Spin};
 
 pub struct Terminal {
     row: u32,
@@ -23,7 +23,8 @@ impl Terminal {
         Self {
             row: 0,
             col: 0,
-            width_in_chars: framebuffer_guard.width / get_raster_width(FontWeight::Regular, RasterHeight::Size20) as u32,
+            width_in_chars: framebuffer_guard.width
+                / get_raster_width(FontWeight::Regular, RasterHeight::Size20) as u32,
             height_in_chars: framebuffer_guard.height / 16,
             char_width: get_raster_width(FontWeight::Regular, RasterHeight::Size20) as u32,
             char_height: 20,
@@ -39,13 +40,13 @@ impl Terminal {
                 b'\n' => {
                     self.col = self.width_in_chars - 1;
                     self.inc_cursor(1, &mut framebuffer_guard);
-                },
+                }
                 b'\t' => self.inc_cursor(4, &mut framebuffer_guard),
                 b'\x08' => self.dec_cursor(1),
                 _ => {
                     self.put_char_at(byte.into(), self.col, self.row, &mut framebuffer_guard);
                     self.inc_cursor(1, &mut framebuffer_guard);
-                },
+                }
             }
         }
     }
@@ -56,14 +57,20 @@ impl Terminal {
         self.row = 0;
     }
 
-    fn put_char_at(&mut self, c: char, x: u32, y: u32, framebuffer: &mut MutexGuard<'_, Framebuffer, Spin>) {
+    fn put_char_at(
+        &mut self,
+        c: char,
+        x: u32,
+        y: u32,
+        framebuffer: &mut MutexGuard<'_, Framebuffer, Spin>,
+    ) {
         let Some(raster) = get_raster(c, FontWeight::Regular, RasterHeight::Size20) else {
             return;
         };
 
         for (row_i, row) in raster.raster().iter().enumerate() {
             let py = y * self.char_height + row_i as u32;
-            if py >= framebuffer.height  {
+            if py >= framebuffer.height {
                 break;
             }
 
@@ -72,7 +79,6 @@ impl Terminal {
                 if px >= framebuffer.width {
                     continue;
                 }
-
 
                 let mut blended = Color {
                     r: ((self.color.r as u32 * intensity as u32) / 255) as u8,
@@ -109,8 +115,7 @@ impl Terminal {
             if self.row > 0 {
                 self.row -= 1;
             }
-        }
-        else {
+        } else {
             self.col -= amount;
         }
     }
@@ -148,7 +153,5 @@ impl Log for TerminalLogger {
         let _ = write!(terminal, "[{}] {}\n", record.level(), record.args());
     }
 
-    fn flush(&self) {
-
-    }
+    fn flush(&self) {}
 }

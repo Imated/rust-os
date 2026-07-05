@@ -2,10 +2,14 @@
 #![no_std]
 #![no_main]
 
-pub mod types;
-pub mod graphics;
 pub mod cpu;
+pub mod graphics;
+pub mod types;
 
+use crate::cpu::gdt;
+use crate::cpu::interrupts;
+use crate::graphics::framebuffer::Framebuffer;
+use crate::graphics::terminal::{Terminal, TerminalLogger};
 use core::panic::PanicInfo;
 use core::ptr::NonNull;
 use lazy_static::lazy_static;
@@ -14,18 +18,20 @@ use log::{debug, error, info, trace, warn};
 use spin::Mutex;
 use volatile::VolatilePtr;
 use x86_64::instructions::hlt;
-use x86_64::instructions::interrupts::int3;
-use crate::cpu::interrupts::init_interrupts;
-use crate::graphics::framebuffer::Framebuffer;
-use crate::graphics::terminal::{Terminal, TerminalLogger};
-use crate::types::Color;
 
 #[unsafe(link_section = ".requests")]
 pub static FRAMEBUFFER_REQUEST: FramebufferRequest = FramebufferRequest::new();
 
 lazy_static! {
     pub static ref FRAMEBUFFER: Mutex<Framebuffer> = unsafe {
-        Mutex::new(Framebuffer::new(FRAMEBUFFER_REQUEST.response().unwrap().framebuffers().first().unwrap()))
+        Mutex::new(Framebuffer::new(
+            FRAMEBUFFER_REQUEST
+                .response()
+                .unwrap()
+                .framebuffers()
+                .first()
+                .unwrap(),
+        ))
     };
 }
 
@@ -44,7 +50,8 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn init() {
-    init_interrupts();
+    gdt::init();
+    interrupts::init();
 }
 
 #[unsafe(no_mangle)]
@@ -61,16 +68,6 @@ pub extern "C" fn _start() -> ! {
     warn!("warn: test warn");
     error!("error: test err");
 
-    unsafe {
-        let ptr = VolatilePtr::new(NonNull::new(0x0000_8000_0000_0000 as *mut u8).unwrap());
-        ptr.write(67);
-    };
-
-
-
-    debug!("e no crash it work");
-
     hlt();
-
     loop {}
 }
