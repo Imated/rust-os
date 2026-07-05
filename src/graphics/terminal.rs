@@ -50,6 +50,12 @@ impl Terminal {
         }
     }
 
+    pub fn clear(&mut self) {
+        FRAMEBUFFER.lock().clear(Color::BACKGROUND_COLOR);
+        self.col = 0;
+        self.row = 0;
+    }
+
     fn put_char_at(&mut self, c: char, x: u32, y: u32, framebuffer: &mut MutexGuard<'_, Framebuffer, Spin>) {
         let Some(raster) = get_raster(c, FontWeight::Regular, RasterHeight::Size20) else {
             return;
