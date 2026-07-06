@@ -26,7 +26,7 @@ impl Terminal {
             col: 0,
             width_in_chars: framebuffer_guard.width
                 / get_raster_width(FontWeight::Regular, RasterHeight::Size20) as u32,
-            height_in_chars: framebuffer_guard.height / 16,
+            height_in_chars: framebuffer_guard.height / 20,
             char_width: get_raster_width(FontWeight::Regular, RasterHeight::Size20) as u32,
             char_height: 20,
             color: Color::WHITE,

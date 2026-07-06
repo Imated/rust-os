@@ -77,6 +77,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f102c477fd4ec864c149803bf606ecc23bc9329602ec0f99073a728abf454abc"
 
 [[package]]
+name = "pic8259"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62d9a86c292b165f757e47e7fd66855def189b2564609bc4203727b27c33db22"
+dependencies = [
+ "x86_64",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -103,6 +112,7 @@ dependencies = [
  "limine",
  "log",
  "noto-sans-mono-bitmap",
+ "pic8259",
  "spin 0.12.1",
  "volatile 0.6.1",
  "x86_64",

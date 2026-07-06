@@ -56,10 +56,11 @@ fn init() {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn _start() -> ! {
-    log::set_logger(&LOGGER).expect("ee");
+pub unsafe extern "C" fn _start() -> ! {
+    x86_64::instructions::interrupts::disable();
+    log::set_logger(&LOGGER).unwrap();
     log::set_max_level(log::LevelFilter::Trace);
-    without_interrupts(|| TERMINAL.lock().clear());
+    TERMINAL.lock().clear();
 
     init();
 
