@@ -26,16 +26,16 @@ lazy_static! {
 
 pub static PICS: Mutex<ChainedPics> = Mutex::new(
     unsafe {
-        ChainedPics::new(32, 32 + 8)
+        ChainedPics::new_contiguous(32)
     }
-); // each PIC holds 8 interrupt lines so second pic starts 8 indices later
+);
 
 pub fn init() {
     IDT.load();
     unsafe {
         let mut pics = PICS.lock();
         pics.initialize();
-        pics.write_masks(0xFE, 0xFF); // unmask only IRQ0 (timer); everything else stays masked
+        pics.write_masks(0xFE, 0xFF); // unmask timer irq
     }
     interrupts::enable();
 }
