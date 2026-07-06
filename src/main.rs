@@ -16,8 +16,8 @@ use lazy_static::lazy_static;
 use limine::request::FramebufferRequest;
 use log::{debug, error, info, trace, warn};
 use spin::Mutex;
-use volatile::VolatilePtr;
 use x86_64::instructions::hlt;
+use x86_64::instructions::interrupts::without_interrupts;
 
 #[unsafe(link_section = ".requests")]
 pub static FRAMEBUFFER_REQUEST: FramebufferRequest = FramebufferRequest::new();
@@ -43,10 +43,11 @@ static LOGGER: TerminalLogger = TerminalLogger;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    TERMINAL.lock().clear();
+    without_interrupts(|| TERMINAL.lock().clear());
     error!("Panic occurred: \n{:?}", info.message());
-    hlt();
-    loop {}
+    loop {
+        hlt();
+    }
 }
 
 fn init() {
@@ -58,7 +59,7 @@ fn init() {
 pub extern "C" fn _start() -> ! {
     log::set_logger(&LOGGER).expect("ee");
     log::set_max_level(log::LevelFilter::Trace);
-    TERMINAL.lock().clear();
+    without_interrupts(|| TERMINAL.lock().clear());
 
     init();
 
@@ -68,6 +69,7 @@ pub extern "C" fn _start() -> ! {
     warn!("warn: test warn");
     error!("error: test err");
 
-    hlt();
-    loop {}
+    loop {
+        hlt();
+    }
 }

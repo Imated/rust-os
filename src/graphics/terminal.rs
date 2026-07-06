@@ -5,6 +5,7 @@ use core::fmt::Write;
 use log::{Level, Log, Metadata, Record};
 use noto_sans_mono_bitmap::{FontWeight, RasterHeight, get_raster, get_raster_width};
 use spin::{MutexGuard, Spin};
+use x86_64::instructions::interrupts::without_interrupts;
 
 pub struct Terminal {
     row: u32,
@@ -140,17 +141,19 @@ impl Log for TerminalLogger {
             return;
         }
 
-        let mut terminal = TERMINAL.lock();
-        let color = match record.level() {
-            Level::Error => Color::RED,
-            Level::Warn => Color::YELLOW,
-            Level::Info => Color::LIGHT_GRAY,
-            Level::Debug => Color::LIGHT_GREEN,
-            Level::Trace => Color::WHITE,
-        };
+        without_interrupts(|| {
+            let mut terminal = TERMINAL.lock();
+            let color = match record.level() {
+                Level::Error => Color::RED,
+                Level::Warn => Color::YELLOW,
+                Level::Info => Color::LIGHT_GRAY,
+                Level::Debug => Color::LIGHT_GREEN,
+                Level::Trace => Color::WHITE,
+            };
 
-        terminal.color = color;
-        let _ = write!(terminal, "[{}] {}\n", record.level(), record.args());
+            terminal.color = color;
+            let _ = write!(terminal, "[{}] {}\n", record.level(), record.args());
+        });
     }
 
     fn flush(&self) {}
