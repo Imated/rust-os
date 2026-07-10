@@ -43,7 +43,10 @@ impl Terminal {
                     self.inc_cursor(1, &mut framebuffer_guard);
                 }
                 b'\t' => self.inc_cursor(4, &mut framebuffer_guard),
-                b'\x08' => self.dec_cursor(1),
+                b'\x08' => {
+                    self.dec_cursor(1);
+                    self.put_char_at(' ', self.col, self.row, &mut framebuffer_guard);
+                },
                 _ => {
                     self.put_char_at(byte.into(), self.col, self.row, &mut framebuffer_guard);
                     self.inc_cursor(1, &mut framebuffer_guard);

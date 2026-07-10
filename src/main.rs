@@ -17,7 +17,7 @@ use limine::request::FramebufferRequest;
 use log::{debug, error, info, trace, warn};
 use spin::Mutex;
 use x86_64::instructions::hlt;
-use x86_64::instructions::interrupts::without_interrupts;
+use x86_64::instructions::interrupts::{int3, without_interrupts};
 
 #[unsafe(link_section = ".requests")]
 pub static FRAMEBUFFER_REQUEST: FramebufferRequest = FramebufferRequest::new();
@@ -63,6 +63,8 @@ pub unsafe extern "C" fn _start() -> ! {
     TERMINAL.lock().clear();
 
     init();
+
+    int3();
 
     trace!("trace: test trace");
     debug!("debug: test debug ({}, {})", 67, 67);

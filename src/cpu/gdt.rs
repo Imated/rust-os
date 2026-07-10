@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use x86_64::instructions::segmentation::Segment;
 use x86_64::instructions::tables::load_tss;
 use x86_64::VirtAddr;
-use x86_64::registers::segmentation::{CS, SegmentSelector, SS};
+use x86_64::registers::segmentation::{CS, SegmentSelector, SS, ES, DS, GS, FS};
 use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable};
 use x86_64::structures::tss::TaskStateSegment;
 
@@ -54,6 +54,10 @@ pub fn init() {
     unsafe {
         CS::set_reg(GDT.1.kernel_code_selector);
         SS::set_reg(GDT.1.kernel_data_selector);
+        ES::set_reg(GDT.1.kernel_data_selector);
+        DS::set_reg(GDT.1.kernel_data_selector);
+        GS::set_reg(GDT.1.kernel_data_selector);
+        FS::set_reg(GDT.1.kernel_data_selector);
         load_tss(GDT.1.tss_selector);
     }
 }
