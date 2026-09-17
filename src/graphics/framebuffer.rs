@@ -1,8 +1,12 @@
 use crate::types::Color;
-use core::fmt::Write;
 use core::slice::from_raw_parts_mut;
-use log::{Log, Metadata, Record};
-use x86_64::instructions::interrupts;
+use limine::request::FramebufferRequest;
+use spin::{Mutex, Once};
+use x86_64::instructions::interrupts::without_interrupts;
+
+#[unsafe(link_section = ".requests")]
+pub static FRAMEBUFFER_REQUEST: FramebufferRequest = FramebufferRequest::new();
+pub static FRAMEBUFFER: Once<Mutex<Framebuffer>> = Once::new();
 
 pub struct Framebuffer {
     front_buffer: &'static mut [Color],
@@ -12,7 +16,7 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
-    pub unsafe fn new(framebuffer: &limine::framebuffer::Framebuffer) -> Self {
+    pub fn new(framebuffer: &limine::framebuffer::Framebuffer) -> Self {
         unsafe {
             let front_buffer = from_raw_parts_mut(
                 framebuffer.address() as *mut Color,
@@ -26,6 +30,17 @@ impl Framebuffer {
                 height: framebuffer.height as u32,
             }
         }
+    }
+
+    pub fn with<R>(f: impl FnOnce(&mut Framebuffer) -> R) -> R {
+        let fb = unsafe { &mut FRAMEBUFFER.get_unchecked().lock() };
+        without_interrupts(|| f(fb))
+    }
+
+    pub unsafe fn with_forced<R>(f: impl FnOnce(&mut Framebuffer) -> R) -> R {
+        let fb = unsafe { &mut FRAMEBUFFER.get_unchecked() };
+        unsafe { fb.force_unlock() };
+        without_interrupts(|| f(&mut fb.lock()))
     }
 
     pub fn set_pixel(&mut self, x: u32, y: u32, color: Color) {
@@ -43,15 +58,13 @@ impl Framebuffer {
             return;
         }
 
-        interrupts::without_interrupts(|| {
-            let copy_len = (self.height - scroll_px) * self.pixels_per_scanline;
-            let src_start = scroll_px * self.pixels_per_scanline;
+        let copy_len = (self.height - scroll_px) * self.pixels_per_scanline;
+        let src_start = scroll_px * self.pixels_per_scanline;
 
-            self.front_buffer
-                .copy_within(src_start as usize..(src_start + copy_len) as usize, 0);
-            self.front_buffer
-                [copy_len as usize..(copy_len + scroll_px * self.pixels_per_scanline) as usize]
-                .fill(Color::BACKGROUND_COLOR);
-        })
+        self.front_buffer
+            .copy_within(src_start as usize..(src_start + copy_len) as usize, 0);
+        self.front_buffer
+            [copy_len as usize..(copy_len + scroll_px * self.pixels_per_scanline) as usize]
+            .fill(Color::BACKGROUND_COLOR);
     }
 }

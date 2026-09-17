@@ -8,49 +8,31 @@ pub mod types;
 
 use crate::cpu::gdt;
 use crate::cpu::interrupts;
-use crate::graphics::framebuffer::Framebuffer;
+use crate::graphics::init_graphics;
 use crate::graphics::terminal::{Terminal, TerminalLogger};
 use core::panic::PanicInfo;
-use core::ptr::NonNull;
-use lazy_static::lazy_static;
-use limine::request::FramebufferRequest;
 use log::{debug, error, info, trace, warn};
-use spin::Mutex;
 use x86_64::instructions::hlt;
-use x86_64::instructions::interrupts::{int3, without_interrupts};
-
-#[unsafe(link_section = ".requests")]
-pub static FRAMEBUFFER_REQUEST: FramebufferRequest = FramebufferRequest::new();
-
-lazy_static! {
-    pub static ref FRAMEBUFFER: Mutex<Framebuffer> = unsafe {
-        Mutex::new(Framebuffer::new(
-            FRAMEBUFFER_REQUEST
-                .response()
-                .unwrap()
-                .framebuffers()
-                .first()
-                .unwrap(),
-        ))
-    };
-}
-
-lazy_static! {
-    pub static ref TERMINAL: Mutex<Terminal> = Mutex::new(Terminal::new());
-}
+use x86_64::instructions::interrupts::int3;
 
 static LOGGER: TerminalLogger = TerminalLogger;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    without_interrupts(|| TERMINAL.lock().clear());
-    error!("Panic occurred: \n{:?}", info.message());
+    unsafe {
+        Terminal::with_forced(|terminal| {
+            terminal.clear();
+        })
+    };
+    error!("\n{:?}", info.message());
+    x86_64::instructions::interrupts::disable();
     loop {
         hlt();
     }
 }
 
 fn init() {
+    init_graphics();
     gdt::init();
     interrupts::init();
 }
@@ -60,10 +42,8 @@ pub unsafe extern "C" fn _start() -> ! {
     x86_64::instructions::interrupts::disable();
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(log::LevelFilter::Trace);
-    TERMINAL.lock().clear();
 
     init();
-
     int3();
 
     trace!("trace: test trace");

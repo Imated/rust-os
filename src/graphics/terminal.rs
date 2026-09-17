@@ -1,11 +1,12 @@
 use crate::graphics::framebuffer::Framebuffer;
 use crate::types::Color;
-use crate::{FRAMEBUFFER, TERMINAL};
 use core::fmt::Write;
 use log::{Level, Log, Metadata, Record};
 use noto_sans_mono_bitmap::{FontWeight, RasterHeight, get_raster, get_raster_width};
-use spin::{MutexGuard, Spin};
+use spin::{Mutex, once::Once};
 use x86_64::instructions::interrupts::without_interrupts;
+
+pub static TERMINAL: Once<Mutex<Terminal>> = Once::new();
 
 pub struct Terminal {
     row: u32,
@@ -17,57 +18,65 @@ pub struct Terminal {
     pub color: Color,
 }
 
-impl Terminal {
-    pub fn new() -> Self {
-        let framebuffer_guard = FRAMEBUFFER.lock();
-
-        Self {
+impl Default for Terminal {
+    fn default() -> Self {
+        Framebuffer::with(|fb| Self {
             row: 0,
             col: 0,
-            width_in_chars: framebuffer_guard.width
+            width_in_chars: fb.width
                 / get_raster_width(FontWeight::Regular, RasterHeight::Size20) as u32,
-            height_in_chars: framebuffer_guard.height / 20,
+            height_in_chars: fb.height / 20,
             char_width: get_raster_width(FontWeight::Regular, RasterHeight::Size20) as u32,
             char_height: 20,
             color: Color::WHITE,
-        }
+        })
+    }
+}
+
+impl Terminal {
+    pub fn with<R>(f: impl FnOnce(&mut Terminal) -> R) -> R {
+        let term = unsafe { &mut TERMINAL.get_unchecked().lock() };
+        without_interrupts(|| f(term))
+    }
+
+    pub unsafe fn with_forced<R>(f: impl FnOnce(&mut Terminal) -> R) -> R {
+        let term = unsafe { &mut TERMINAL.get_unchecked() };
+        unsafe { term.force_unlock() };
+        without_interrupts(|| f(&mut term.lock()))
     }
 
     pub fn put_str(&mut self, str: &str) {
-        let mut framebuffer_guard = FRAMEBUFFER.lock();
-
-        for byte in str.bytes() {
-            match byte {
-                b'\n' => {
-                    self.col = self.width_in_chars - 1;
-                    self.inc_cursor(1, &mut framebuffer_guard);
-                }
-                b'\t' => self.inc_cursor(4, &mut framebuffer_guard),
-                b'\x08' => {
-                    self.dec_cursor(1);
-                    self.put_char_at(' ', self.col, self.row, &mut framebuffer_guard);
-                },
-                _ => {
-                    self.put_char_at(byte.into(), self.col, self.row, &mut framebuffer_guard);
-                    self.inc_cursor(1, &mut framebuffer_guard);
+        Framebuffer::with(|fb| {
+            for byte in str.bytes() {
+                match byte {
+                    b'\n' => {
+                        self.col = self.width_in_chars - 1;
+                        self.inc_cursor(1, fb);
+                    }
+                    b'\t' => self.inc_cursor(4, fb),
+                    b'\x08' => {
+                        // backspace
+                        self.dec_cursor(1);
+                        self.put_char_at(' ', self.col, self.row, fb);
+                    }
+                    _ => {
+                        self.put_char_at(byte.into(), self.col, self.row, fb);
+                        self.inc_cursor(1, fb);
+                    }
                 }
             }
-        }
+        })
     }
 
     pub fn clear(&mut self) {
-        FRAMEBUFFER.lock().clear(Color::BACKGROUND_COLOR);
-        self.col = 0;
-        self.row = 0;
+        Framebuffer::with(|fb| {
+            fb.clear(Color::BACKGROUND_COLOR);
+            self.col = 0;
+            self.row = 0;
+        })
     }
 
-    fn put_char_at(
-        &mut self,
-        c: char,
-        x: u32,
-        y: u32,
-        framebuffer: &mut MutexGuard<'_, Framebuffer, Spin>,
-    ) {
+    fn put_char_at(&mut self, c: char, x: u32, y: u32, framebuffer: &mut Framebuffer) {
         let Some(raster) = get_raster(c, FontWeight::Regular, RasterHeight::Size20) else {
             return;
         };
@@ -100,7 +109,7 @@ impl Terminal {
         }
     }
 
-    fn inc_cursor(&mut self, amount: u32, framebuffer: &mut MutexGuard<'_, Framebuffer, Spin>) {
+    fn inc_cursor(&mut self, amount: u32, framebuffer: &mut Framebuffer) {
         self.col += amount;
         if self.col >= self.width_in_chars {
             self.col = 0;
@@ -135,7 +144,7 @@ impl Write for Terminal {
 pub struct TerminalLogger;
 
 impl Log for TerminalLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
 
@@ -144,8 +153,7 @@ impl Log for TerminalLogger {
             return;
         }
 
-        without_interrupts(|| {
-            let mut terminal = TERMINAL.lock();
+        Terminal::with(|term| {
             let color = match record.level() {
                 Level::Error => Color::RED,
                 Level::Warn => Color::YELLOW,
@@ -154,8 +162,8 @@ impl Log for TerminalLogger {
                 Level::Trace => Color::WHITE,
             };
 
-            terminal.color = color;
-            let _ = write!(terminal, "[{}] {}\n", record.level(), record.args());
+            term.color = color;
+            let _ = writeln!(term, "[{}] {}", record.level(), record.args());
         });
     }
 
