@@ -1,9 +1,10 @@
-#![feature(abi_x86_interrupt)]
+#![feature(abi_x86_interrupt, type_alias_impl_trait)]
 #![no_std]
 #![no_main]
 
 pub mod cpu;
 pub mod graphics;
+pub mod memory;
 pub mod types;
 
 use crate::cpu::gdt;
@@ -32,13 +33,14 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn init() {
-    init_graphics();
+    memory::init();
     gdt::init();
     interrupts::init();
+    init_graphics();
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn _start() -> ! {
+pub extern "C" fn _start() -> ! {
     x86_64::instructions::interrupts::disable();
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(log::LevelFilter::Trace);

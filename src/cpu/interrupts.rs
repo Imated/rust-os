@@ -8,7 +8,8 @@ use pic8259::ChainedPics;
 use spin::{Mutex, Once};
 use x86_64::instructions::interrupts;
 use x86_64::instructions::port::Port;
-use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
+use x86_64::registers::control::Cr2;
+use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -28,6 +29,7 @@ pub fn init() {
         idt.double_fault
             .set_handler_fn(double_fault_handler)
             .set_stack_index(DOUBLE_FAULT_IST_INDEX);
+        idt.page_fault.set_handler_fn(page_fault_handler);
         idt[InterruptIndex::Timer as u8].set_handler_fn(timer_interrupt_handler);
         idt[InterruptIndex::Keyboard as u8].set_handler_fn(keyboard_interrupt_handler);
         idt
@@ -39,6 +41,23 @@ pub fn init() {
         pics.write_masks(0x00, 0x00); // unmask EVERYTHING
     }
     interrupts::enable();
+}
+
+extern "x86-interrupt" fn page_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: PageFaultErrorCode,
+) {
+    unsafe {
+        Terminal::with_forced(|terminal| {
+            terminal.clear();
+        })
+    };
+    panic!(
+        "Exception occurred: Page Fault!\nError Code: {:?}\nAddress Accessed: {}\n{:#?}",
+        error_code,
+        Cr2::read_raw(),
+        stack_frame
+    );
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {

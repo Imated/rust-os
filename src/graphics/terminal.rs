@@ -7,7 +7,6 @@ use spin::{Mutex, once::Once};
 use x86_64::instructions::interrupts::without_interrupts;
 
 pub static TERMINAL: Once<Mutex<Terminal>> = Once::new();
-
 pub struct Terminal {
     row: u32,
     col: u32,
