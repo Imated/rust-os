@@ -1,37 +1,16 @@
 use core::sync::atomic::AtomicUsize;
 
-use limine::{
-    memmap::{MEMMAP_ACPI_RECLAIMABLE, MEMMAP_BOOTLOADER_RECLAIMABLE, MEMMAP_USABLE},
-    request::{HhdmRequest, MemmapRequest},
-};
-use spin::{Mutex, once::Once};
+use limine::memmap::{MEMMAP_ACPI_RECLAIMABLE, MEMMAP_USABLE};
 use x86_64::{
     PhysAddr, VirtAddr,
     registers::control::Cr3,
     structures::paging::{
         FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame,
-        Size4KiB,
+        Size4KiB, page::PageRangeInclusive,
     },
 };
 
-pub struct EmptyFrameAllocator;
-
-unsafe impl FrameAllocator<Size4KiB> for EmptyFrameAllocator {
-    fn allocate_frame(&mut self) -> Option<PhysFrame> {
-        None
-    }
-}
-
-#[unsafe(link_section = ".requests")]
-pub static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
-#[unsafe(link_section = ".requests")]
-pub static MMAP_REQUEST: MemmapRequest = MemmapRequest::new();
-
-pub static PAGING: Mutex<Once<Paging>> = Mutex::new(Once::new());
-
-pub fn init() {
-    PAGING.lock().call_once(Paging::default);
-}
+use crate::mem::{HHDM_REQUEST, MMAP_REQUEST, PAGING};
 
 pub struct Paging {
     mapper: OffsetPageTable<'static>,
@@ -60,6 +39,24 @@ impl Paging {
         };
     }
 
+    pub fn map_memory_global_range(
+        range: PageRangeInclusive,
+        phys: PhysAddr,
+        flags: PageTableFlags,
+    ) {
+        unsafe {
+            let mut paging_lock = PAGING.lock();
+            let paging = paging_lock.get_mut_unchecked();
+            for page in range {
+                paging.map_memory(page.start_address(), phys, flags);
+            }
+        };
+    }
+
+    pub fn allocate_frame_global() -> PhysFrame {
+        unsafe { PAGING.lock().get_mut_unchecked().allocate_frame() }
+    }
+
     pub fn map_memory(&mut self, virt: VirtAddr, phys: PhysAddr, flags: PageTableFlags) {
         let frame: PhysFrame<Size4KiB> = PhysFrame::containing_address(phys);
         let page = Page::containing_address(virt);
@@ -69,6 +66,10 @@ impl Paging {
                 .expect("Couldnt find available frame to allocate. >:C")
                 .flush();
         };
+    }
+
+    pub fn allocate_frame(&self) -> PhysFrame {
+        FrameCursor(&self.next).allocate_frame().unwrap()
     }
 
     pub fn active_ptl4(hhdm_offset: VirtAddr) -> &'static mut PageTable {

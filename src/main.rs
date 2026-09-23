@@ -1,16 +1,19 @@
-#![feature(abi_x86_interrupt, type_alias_impl_trait)]
+#![feature(abi_x86_interrupt)]
 #![no_std]
 #![no_main]
 
 pub mod cpu;
 pub mod graphics;
-pub mod memory;
+pub mod mem;
 pub mod types;
+
+extern crate alloc;
 
 use crate::cpu::gdt;
 use crate::cpu::interrupts;
 use crate::graphics::init_graphics;
 use crate::graphics::terminal::{Terminal, TerminalLogger};
+use alloc::boxed::Box;
 use core::panic::PanicInfo;
 use log::{debug, error, info, trace, warn};
 use x86_64::instructions::hlt;
@@ -33,7 +36,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn init() {
-    memory::init();
+    mem::init();
     gdt::init();
     interrupts::init();
     init_graphics();
@@ -53,6 +56,9 @@ pub extern "C" fn _start() -> ! {
     info!("info: test info");
     warn!("warn: test warn");
     error!("error: test err");
+
+    let e = Box::new(67);
+    trace!("eeee heap works!! {e}");
 
     loop {
         hlt();
