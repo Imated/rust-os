@@ -36,8 +36,8 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn init() {
-    mem::init();
     gdt::init();
+    mem::init();
     interrupts::init();
     init_graphics();
 }
